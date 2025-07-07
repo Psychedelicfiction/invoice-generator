@@ -146,10 +146,14 @@ export default function InvoiceGenerator() {
     if (!validation()) return
     const input = document.getElementById("invoice-preview")
     if (!input) return
+    
+    input.style.overflow = "visible"
+    input.style.maxWidth = "794px"
     try {
       postInvoice()
-      const canvas = await html2canvas(input, { scale: 1.5, useCORS: true, windowWidth: input.scrollWidth, // ensure full width capture
-      scrollY: -window.scrollY, })
+      window.scrollTo(0, 0);
+      const canvas = await html2canvas(input, { scale: 2, useCORS: true, windowWidth: input.scrollWidth,
+      scrollY: -window.scrollY,  allowTaint: false, backgroundColor: "#ffffff", })
       const imgData = canvas.toDataURL("image/jpeg", 1)
       const pdf = new jsPDF("p", "mm", "a4")
       const pdfWidth = pdf.internal.pageSize.getWidth()
@@ -382,8 +386,8 @@ export default function InvoiceGenerator() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {invoiceData.lineItems.map((item, index) => (
-                  <div key={item.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
-                    <div className="col-span-5">
+                  <div key={item.id} className="flex flex-wrap gap-2 items-end">
+                    <div className="w-full sm:w-[30%]">
                       <Label>Description</Label>
                       <Input
                         value={item.description}
@@ -391,7 +395,7 @@ export default function InvoiceGenerator() {
                         placeholder="Service or product description"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="w-1/2 sm:w-[20%]">
                       <Label>Qty</Label>
                       <Input
                         type="number"
@@ -399,23 +403,24 @@ export default function InvoiceGenerator() {
                         onChange={(e) => updateLineItem(item.id, "quantity", Number.parseFloat(e.target.value) || 0)}
                         min="0"
                         step="0.01"
+                        className="text-sm px-2 py-1 w-full "
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="w-1/2 sm:w-[20%]">
                       <Label>Rate</Label>
                       <Input
                         type="number"
-                        value={item.rate} className="text-sm px-2 py-1 w-full sm:w-24"
+                        value={item.rate} className="text-sm px-2 py-1 w-full"
                         onChange={(e) => updateLineItem(item.id, "rate", Number.parseFloat(e.target.value) || 0)}
                         min="0"
                         step="0.01"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="w-1/2 sm:w-[20%]">
                       <Label>Amount</Label>
-                      <Input value={`$${item.amount.toFixed(2)}`} readOnly className="bg-gray-50" />
+                      <Input value={`$${item.amount.toFixed(2)}`} readOnly className="text-sm px-2 py-1 w-full bg-gray-50" />
                     </div>
-                    <div className="col-span-1">
+                    <div className="w-1/2 sm:w-[10%] flex justify-end">
                       {invoiceData.lineItems.length > 1 && (
                         <Button
                           onClick={() => removeLineItem(item.id)}
@@ -465,7 +470,7 @@ export default function InvoiceGenerator() {
           </div>
 
           {/* Invoice Preview */}
-          <div id = "invoice-preview" className="lg:sticky lg:top-4 max-w-full overflow-x-auto">
+          <div id = "invoice-preview" className=" mx-auto max-w-[794px] overflow-visible bg-white lg:sticky lg:top-4 max-w-full overflow-x-auto">
             <Card>
               <CardContent className="p-0">
                 <div ref={printRef} className="bg-white p-4 sm:p-8 p-8 print:p-8 print:shadow-none">
@@ -523,7 +528,7 @@ export default function InvoiceGenerator() {
                       <thead>
                         <tr className="border-b border-gray-200">
                           <th className="text-left py-2 font-medium text-gray-900 w-2/5">Description</th>
-                          <th className="text-right py-2 font-medium text-gray-900 w-1/5 ">Qty</th>
+                          <th className="text-right py-2 font-medium text-gray-900 w-2/5 ">Qty</th>
                           <th className="text-right py-2 font-medium text-gray-900 w-1/5">Rate</th>
                           <th className="text-right py-2 font-medium text-gray-900 w-1/5">Amount</th>
                         </tr>
@@ -589,6 +594,7 @@ export default function InvoiceGenerator() {
 
           #invoice-preview {
             position: relative !important;
+            max-width: 800px;
             width: 100% !important;
             box-sizing: border-box;
             margin: 0 auto;
