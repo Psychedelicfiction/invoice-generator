@@ -148,11 +148,13 @@ export default function InvoiceGenerator() {
     if (!input) return
     try {
       postInvoice()
-      const canvas = await html2canvas(input, { scale: 1.5, useCORS: true })
+      const canvas = await html2canvas(input, { scale: 1.5, useCORS: true, windowWidth: input.scrollWidth, // ensure full width capture
+      scrollY: -window.scrollY, })
       const imgData = canvas.toDataURL("image/jpeg", 1)
       const pdf = new jsPDF("p", "mm", "a4")
       const pdfWidth = pdf.internal.pageSize.getWidth()
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width
+
       pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight)
       pdf.save(`${invoiceData.invoiceNumber || "invoice"}.pdf`)
       toast({
@@ -380,7 +382,7 @@ export default function InvoiceGenerator() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {invoiceData.lineItems.map((item, index) => (
-                  <div key={item.id} className="grid grid-cols-12 gap-2 items-end">
+                  <div key={item.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
                     <div className="col-span-5">
                       <Label>Description</Label>
                       <Input
@@ -488,9 +490,9 @@ export default function InvoiceGenerator() {
                   </div>
 
                   {/* Invoice Details */}
-                  <div className="grid grid-cols-2 gap-8 mb-8">
+                  <div className="grid sm:grid-cols-2 grid-cols-1 gap-8 mb-8">
                     <div>
-                      <h3 className="font-semibold text-gray-900 mb-2">Bill To:</h3>
+                      <h3 className="flex flex-col sm:grid sm:grid-cols-2 gap-6 mb-8">Bill To:</h3>
                       <div className="text-gray-600 space-y-1">
                         <p className="font-medium">{invoiceData.clientName || "Client Name"}</p>
                         {invoiceData.clientAddress && (
@@ -516,8 +518,8 @@ export default function InvoiceGenerator() {
                   <Separator className="mb-6" />
 
                   {/* Line Items Table */}
-                  <div className="mb-8">
-                    <table className="w-full table-fixed">
+                  <div className="mb-8 overflow-x-auto">
+                    <table className="min-w-full table-auto text-sm sm:text-base">
                       <thead>
                         <tr className="border-b border-gray-200">
                           <th className="text-left py-2 font-medium text-gray-900 w-2/5">Description</th>
@@ -529,10 +531,10 @@ export default function InvoiceGenerator() {
                       <tbody>
                         {invoiceData.lineItems.map((item) => (
                           <tr key={item.id} className="border-b border-gray-100">
-                            <td className="py-3 text-gray-700">{item.description || "Service description"}</td>
-                            <td className="py-3 text-right text-gray-700">{item.quantity}</td>
-                            <td className="py-3 text-right text-gray-700">${item.rate.toFixed(2)}</td>
-                            <td className="py-3 text-right text-gray-700">${item.amount.toFixed(2)}</td>
+                            <td className="py-2 pr-2 break-words text-gray-600 max-w-[200px] sm:max-w-none">{item.description || "Service description"}</td>
+                            <td className="py-3 text-right whitespace-nowrap text-gray-600 max-w-[200px] sm:max-w-none">{item.quantity}</td>
+                            <td className="py-3  text-right whitespace-nowrap text-gray-600 max-w-[200px] sm:max-w-none">${item.rate.toFixed(2)}</td>
+                            <td className="py-3 text-right whitespace-nowrap text-gray-600 max-w-[200px] sm:max-w-none">${item.amount.toFixed(2)}</td>
                           </tr>
                         ))}
                       </tbody>
