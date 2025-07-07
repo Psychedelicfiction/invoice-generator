@@ -115,7 +115,7 @@ const downloadPDFDesktop = (blob: Blob, filename: string): void => {
 const downloadPDFMobile = async (blob: Blob, filename: string): Promise<void> => {
   try {
     // Try Web Share API first (modern mobile browsers)
-    if (navigator.share && navigator.canShare) {
+  /*  if (navigator.share && navigator.canShare) {
       const file = new File([blob], filename, { type: "application/pdf" })
 
       if (navigator.canShare({ files: [file] })) {
@@ -126,7 +126,7 @@ const downloadPDFMobile = async (blob: Blob, filename: string): Promise<void> =>
         })
         return
       }
-    }
+    } */
 
     // Fallback: Open PDF in new tab/window for mobile
     const url = URL.createObjectURL(blob)
