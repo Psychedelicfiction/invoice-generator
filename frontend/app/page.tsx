@@ -403,7 +403,7 @@ export default function InvoiceGenerator() {
                       <Label>Rate</Label>
                       <Input
                         type="number"
-                        value={item.rate}
+                        value={item.rate} className="text-sm px-2 py-1 w-full sm:w-24"
                         onChange={(e) => updateLineItem(item.id, "rate", Number.parseFloat(e.target.value) || 0)}
                         min="0"
                         step="0.01"
@@ -463,10 +463,10 @@ export default function InvoiceGenerator() {
           </div>
 
           {/* Invoice Preview */}
-          <div id = "invoice-preview" className="lg:sticky lg:top-4">
+          <div id = "invoice-preview" className="lg:sticky lg:top-4 max-w-full overflow-x-auto">
             <Card>
               <CardContent className="p-0">
-                <div ref={printRef} className="bg-white p-8 print:p-0 print:shadow-none">
+                <div ref={printRef} className="bg-white p-4 sm:p-8 p-8 print:p-8 print:shadow-none">
                   {/* Invoice Header */}
                   <div className="flex justify-between items-start mb-8">
                     <div>
@@ -517,13 +517,13 @@ export default function InvoiceGenerator() {
 
                   {/* Line Items Table */}
                   <div className="mb-8">
-                    <table className="w-full">
+                    <table className="w-full table-fixed">
                       <thead>
                         <tr className="border-b border-gray-200">
-                          <th className="text-left py-2 font-medium text-gray-900">Description</th>
-                          <th className="text-right py-2 font-medium text-gray-900 w-20">Qty</th>
-                          <th className="text-right py-2 font-medium text-gray-900 w-24">Rate</th>
-                          <th className="text-right py-2 font-medium text-gray-900 w-24">Amount</th>
+                          <th className="text-left py-2 font-medium text-gray-900 w-2/5">Description</th>
+                          <th className="text-right py-2 font-medium text-gray-900 w-1/5 ">Qty</th>
+                          <th className="text-right py-2 font-medium text-gray-900 w-1/5">Rate</th>
+                          <th className="text-right py-2 font-medium text-gray-900 w-1/5">Amount</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -579,20 +579,40 @@ export default function InvoiceGenerator() {
           body * {
             visibility: hidden;
           }
+
+          #invoice-preview,
+          #invoice-preview * {
+            visibility: visible !important;
+          }
+
+          #invoice-preview {
+            position: relative !important;
+            width: 100% !important;
+            box-sizing: border-box;
+            margin: 0 auto;
+            page-break-inside: avoid;
+          }
+          #invoice-preview {
+            padding: 32px !important;
+          }
           .print\\:block {
             display: block !important;
           }
+
           .print\\:hidden {
             display: none !important;
           }
+
           .print\\:p-0 {
             padding: 0 !important;
           }
+
           .print\\:shadow-none {
             box-shadow: none !important;
           }
         }
-      `}</style>
+    `}</style>
+
     
 
        

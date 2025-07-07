@@ -15,7 +15,7 @@ export const emailTemplates = [
     id: "default",
     name: "Default Template",
     subject: "Invoice #{invoiceNumber} from {companyName}",
-    message: `Dear{clientName} client,
+    message: `Dear {clientName},
 
 Please find attached invoice #{invoiceNumber} for the amount of {totalAmount}.
 
