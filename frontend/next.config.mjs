@@ -1,20 +1,6 @@
 /** @type {import('next').NextConfig} */
-module.exports = {
-  reactStrictMode: true,
-  images: {
-  
-  },
-  // Optional if proxying
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'https://https://invoice-backend-g5q0.onrender.com/api/:path*',
-      },
-    ]
-  },
-}
 const nextConfig = {
+  reactStrictMode: true,
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -24,6 +10,14 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-}
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'https://invoice-backend-g5q0.onrender.com/api/:path*',
+      },
+    ];
+  },
+};
 
-export default nextConfig
+export default nextConfig;

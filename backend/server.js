@@ -18,7 +18,7 @@ connectDB();
 
 
 //middleware
-app.use(cors({ origin: 'http://localhost:3000' }));
+app.use(cors({ origin: 'https://invoice-frontend-o45y.onrender.com' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
