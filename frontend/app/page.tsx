@@ -7,15 +7,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
-import { Plus, Trash2, Printer, Download, Save, Mail } from "lucide-react"
+import { Plus, Trash2, Printer, Download, Save, Mail, Loader2 } from "lucide-react"
 import { InvoiceList } from "@/components/invoice-list"
+import { EmailHistory } from "@/components/email-history"
 import { saveInvoice } from "@/lib/invoice-storage"
-import type { InvoiceData, LineItem } from "@/types/invoice"
+import type { InvoiceData, LineItem, SavedInvoice } from "@/types/invoice"
 import { useToast } from "@/components/ui/use-toast"
 import { EmailInvoiceDialog } from "@/components/email-invoice-dialog"
-import { processEmailTemplate, emailTemplates } from "@/lib/email-service"
-import { jsPDF } from "jspdf"
-import html2canvas from "html2canvas"
+import { emailTemplates } from "@/lib/email-service"
+import { generateInvoicePDF, getInvoiceFilename } from "@/lib/pdf-generator"
 
 const createEmptyInvoice = (): InvoiceData => ({
   invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
@@ -40,6 +40,7 @@ export default function InvoiceGenerator() {
   const [invoiceData, setInvoiceData] = useState<InvoiceData>(createEmptyInvoice())
   const [selectedTemplate, setSelectedTemplate] = useState(emailTemplates[0])
   const [isInitialized, setIsInitialized] = useState(false)
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
 
   useEffect(() => {
     setInvoiceData(createEmptyInvoice())
@@ -108,9 +109,7 @@ export default function InvoiceGenerator() {
       })
       return false
     }
-    const invalidLineItems = invoiceData.lineItems.filter(
-      (item) => !item.description?.trim() || item.amount === 0
-    )
+    const invalidLineItems = invoiceData.lineItems.filter((item) => !item.description?.trim() || item.amount === 0)
     if (invoiceData.lineItems.length === 0 || invalidLineItems.length > 0) {
       toast({
         title: "Invalid line items",
@@ -144,34 +143,39 @@ export default function InvoiceGenerator() {
 
   const handleDownload = async () => {
     if (!validation()) return
-    const input = document.getElementById("invoice-preview")
-    if (!input) return
-    
-    input.style.overflow = "visible"
-    input.style.maxWidth = "794px"
-    try {
-      postInvoice()
-      window.scrollTo(0, 0);
-      const canvas = await html2canvas(input, { scale: 2, useCORS: true, windowWidth: input.scrollWidth,
-      scrollY: -window.scrollY,  allowTaint: false, backgroundColor: "#ffffff", })
-      const imgData = canvas.toDataURL("image/jpeg", 1)
-      const pdf = new jsPDF("p", "mm", "a4")
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width
 
-      pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight)
-      pdf.save(`${invoiceData.invoiceNumber || "invoice"}.pdf`)
-      toast({
-        title: "Download Successful",
-        description: `Invoice ${invoiceData.invoiceNumber} downloaded.`,
+    setIsGeneratingPDF(true)
+
+    try {
+      const filename = getInvoiceFilename(invoiceData.invoiceNumber)
+      const result = await generateInvoicePDF("invoice-preview", {
+        filename,
+        quality: 0.95,
+        scale: 2,
       })
-    } catch (err) {
-      console.error("Error generating PDF", err)
+
+      if (result.success) {
+        await postInvoice()
+        toast({
+          title: "PDF Generated! 📄",
+          description: result.message,
+        })
+      } else {
+        toast({
+          title: "PDF Generation Failed",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("PDF generation error:", error)
       toast({
-        title: "Download Failed",
-        description: "There was a problem generating the PDF.",
+        title: "PDF Generation Failed",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setIsGeneratingPDF(false)
     }
   }
 
@@ -194,8 +198,31 @@ export default function InvoiceGenerator() {
     }
   }
 
-  const generatePdfBase64 = async (): Promise<string | null> => {
-    const input = document.getElementById("invoice-preview")
+  const handleLoadInvoice = (invoice: SavedInvoice) => {
+    setInvoiceData({
+      invoiceNumber: invoice.invoiceNumber,
+      id: invoice.id,
+      invoiceDate: invoice.invoiceDate,
+      dueDate: invoice.dueDate,
+      companyName: invoice.companyName,
+      companyAddress: invoice.companyAddress,
+      companyEmail: invoice.companyEmail,
+      companyPhone: invoice.companyPhone,
+      clientName: invoice.clientName,
+      clientAddress: invoice.clientAddress,
+      clientEmail: invoice.clientEmail,
+      lineItems: invoice.lineItems,
+      taxRate: invoice.taxRate,
+      notes: invoice.notes,
+    })
+    toast({
+      title: "Invoice loaded",
+      description: `Invoice ${invoice.invoiceNumber} has been loaded for editing.`,
+    })
+  }
+
+  /* const generatePdfBase64 = async (): Promise<string | null> => {
+    const input = document.getElementById("invoice-preview") 
     if (!input) return null
     try {
       const canvas = await html2canvas(input, { scale: 1.5, useCORS: true })
@@ -212,7 +239,7 @@ export default function InvoiceGenerator() {
       console.error("Error generating PDF for email", err)
       return null
     }
-  }
+  } */
 
   const handleNewInvoice = () => {
     if (confirm("Are you sure you want to create a new invoice? Unsaved changes will be lost.")) {
@@ -236,17 +263,48 @@ export default function InvoiceGenerator() {
   return (
     <div className="min-h-screen p-6 bg-gray-50">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex flex-wrap gap-3">
-          <Button onClick={handleNewInvoice} variant="outline">New Invoice</Button>
-          <InvoiceList onInvoiceDeleted={handleInvoiceDeleted} />
-          <Button onClick={handleSaveInvoice} variant="outline"><Save className="w-4 h-4 mr-2" />Save</Button>
-          <EmailInvoiceDialog invoiceData={invoiceData} totalAmount={total} >
-            <Button variant="outline"><Mail className="w-4 h-4 mr-2" />Email</Button>
-          </EmailInvoiceDialog>
-          <Button onClick={handlePrint} variant="outline"><Printer className="w-4 h-4 mr-2" />Print</Button>
-          <Button onClick={handleDownload}><Download className="w-4 h-4 mr-2" />Download PDF</Button>
+        <div className="space-y-4">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Invoice Generator</h1>
+          <div className="flex flex-wrap gap-2 print:hidden">
+            <div className="flex gap-2 flex-wrap">
+              <InvoiceList onLoadInvoice={handleLoadInvoice} onInvoiceDeleted={handleInvoiceDeleted} />
+              <EmailHistory />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button onClick={handleNewInvoice} variant="outline" size="sm">
+                New Invoice
+              </Button>
+              <Button onClick={handleSaveInvoice} variant="outline" size="sm">
+                <Save className="w-4 h-4 mr-2" />
+                Save
+              </Button>
+              <EmailInvoiceDialog invoiceData={invoiceData} totalAmount={total}>
+                <Button variant="outline" size="sm">
+                  <Mail className="w-4 h-4 mr-2" />
+                  Email
+                </Button>
+              </EmailInvoiceDialog>
+              <Button onClick={handlePrint} variant="outline" size="sm">
+                <Printer className="w-4 h-4 mr-2" />
+                Print
+              </Button>
+              <Button onClick={handleDownload} size="sm" disabled={isGeneratingPDF}>
+                {isGeneratingPDF ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download PDF
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
           {/* Form Section */}
           <div className="space-y-6 print:hidden">
             {/* Invoice Details */}
@@ -285,7 +343,6 @@ export default function InvoiceGenerator() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Company Information */}
             <Card>
               <CardHeader>
@@ -334,7 +391,6 @@ export default function InvoiceGenerator() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Client Information */}
             <Card>
               <CardHeader>
@@ -372,7 +428,6 @@ export default function InvoiceGenerator() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Line Items */}
             <Card>
               <CardHeader>
@@ -386,57 +441,61 @@ export default function InvoiceGenerator() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {invoiceData.lineItems.map((item, index) => (
-                  <div key={item.id} className="flex flex-wrap gap-2 items-end">
-                    <div className="w-full sm:w-[30%]">
-                      <Label>Description</Label>
-                      <Input
-                        value={item.description}
-                        onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
-                        placeholder="Service or product description"
-                      />
-                    </div>
-                    <div className="w-1/2 sm:w-[20%]">
-                      <Label>Qty</Label>
-                      <Input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => updateLineItem(item.id, "quantity", Number.parseFloat(e.target.value) || 0)}
-                        min="0"
-                        step="0.01"
-                        className="text-sm px-2 py-1 w-full "
-                      />
-                    </div>
-                    <div className="w-1/2 sm:w-[20%]">
-                      <Label>Rate</Label>
-                      <Input
-                        type="number"
-                        value={item.rate} className="text-sm px-2 py-1 w-full"
-                        onChange={(e) => updateLineItem(item.id, "rate", Number.parseFloat(e.target.value) || 0)}
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-                    <div className="w-1/2 sm:w-[20%]">
-                      <Label>Amount</Label>
-                      <Input value={`$${item.amount.toFixed(2)}`} readOnly className="text-sm px-2 py-1 w-full bg-gray-50" />
-                    </div>
-                    <div className="w-1/2 sm:w-[10%] flex justify-end">
-                      {invoiceData.lineItems.length > 1 && (
-                        <Button
-                          onClick={() => removeLineItem(item.id)}
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
+                  <div key={item.id} className="space-y-3 p-4 border rounded-lg bg-gray-50">
+                    <div className="space-y-3">
+                      <div>
+                        <Label>Description</Label>
+                        <Input
+                          value={item.description}
+                          onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
+                          placeholder="Service or product description"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Quantity</Label>
+                          <Input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) =>
+                              updateLineItem(item.id, "quantity", Number.parseFloat(e.target.value) || 0)
+                            }
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+                        <div>
+                          <Label>Rate ($)</Label>
+                          <Input
+                            type="number"
+                            value={item.rate}
+                            onChange={(e) => updateLineItem(item.id, "rate", Number.parseFloat(e.target.value) || 0)}
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <Label>Amount</Label>
+                          <div className="text-lg font-semibold text-green-600">${item.amount.toFixed(2)}</div>
+                        </div>
+                        {invoiceData.lineItems.length > 1 && (
+                          <Button
+                            onClick={() => removeLineItem(item.id)}
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
               </CardContent>
             </Card>
-
             {/* Tax and Notes */}
             <Card>
               <CardHeader>
@@ -468,20 +527,19 @@ export default function InvoiceGenerator() {
               </CardContent>
             </Card>
           </div>
-
           {/* Invoice Preview */}
-          <div id = "invoice-preview" className=" mx-auto max-w-[794px] overflow-visible bg-white lg:sticky lg:top-4 max-w-full overflow-x-auto">
+          <div className="xl:sticky xl:top-4">
             <Card>
               <CardContent className="p-0">
-                <div ref={printRef} className="bg-white p-4 sm:p-8 p-8 print:p-8 print:shadow-none">
+                <div id="invoice-preview" ref={printRef} className="bg-white p-4 md:p-8 print:p-0 print:shadow-none">
                   {/* Invoice Header */}
-                  <div className="flex justify-between items-start mb-8">
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-6 md:mb-8 space-y-4 md:space-y-0">
                     <div>
-                      <h1 className="text-3xl font-bold text-gray-900 mb-2">INVOICE</h1>
+                      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">INVOICE</h1>
                       <p className="text-gray-600">#{invoiceData.invoiceNumber}</p>
                     </div>
-                    <div className="text-right">
-                      <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                    <div className="md:text-right">
+                      <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-2">
                         {invoiceData.companyName || "Your Company"}
                       </h2>
                       <div className="text-gray-600 text-sm space-y-1">
@@ -493,11 +551,10 @@ export default function InvoiceGenerator() {
                       </div>
                     </div>
                   </div>
-
                   {/* Invoice Details */}
-                  <div className="grid sm:grid-cols-2 grid-cols-1 gap-8 mb-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mb-6 md:mb-8">
                     <div>
-                      <h3 className="flex flex-col sm:grid sm:grid-cols-2 gap-6 mb-8">Bill To:</h3>
+                      <h3 className="font-semibold text-gray-900 mb-2">Bill To:</h3>
                       <div className="text-gray-600 space-y-1">
                         <p className="font-medium">{invoiceData.clientName || "Client Name"}</p>
                         {invoiceData.clientAddress && (
@@ -519,36 +576,61 @@ export default function InvoiceGenerator() {
                       </div>
                     </div>
                   </div>
-
                   <Separator className="mb-6" />
-
                   {/* Line Items Table */}
-                  <div className="mb-8 overflow-x-auto">
-                    <table className="min-w-full table-auto text-sm sm:text-base">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="text-left py-2 font-medium text-gray-900 w-2/5">Description</th>
-                          <th className="text-right py-2 font-medium text-gray-900 w-2/5 ">Qty</th>
-                          <th className="text-right py-2 font-medium text-gray-900 w-1/5">Rate</th>
-                          <th className="text-right py-2 font-medium text-gray-900 w-1/5">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {invoiceData.lineItems.map((item) => (
-                          <tr key={item.id} className="border-b border-gray-100">
-                            <td className="py-2 pr-2 break-words text-gray-600 max-w-[200px] sm:max-w-none">{item.description || "Service description"}</td>
-                            <td className="py-3 text-right whitespace-nowrap text-gray-600 max-w-[200px] sm:max-w-none">{item.quantity}</td>
-                            <td className="py-3  text-right whitespace-nowrap text-gray-600 max-w-[200px] sm:max-w-none">${item.rate.toFixed(2)}</td>
-                            <td className="py-3 text-right whitespace-nowrap text-gray-600 max-w-[200px] sm:max-w-none">${item.amount.toFixed(2)}</td>
+                  <div className="mb-6 md:mb-8">
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="text-left py-2 font-medium text-gray-900">Description</th>
+                            <th className="text-right py-2 font-medium text-gray-900 w-20">Qty</th>
+                            <th className="text-right py-2 font-medium text-gray-900 w-24">Rate</th>
+                            <th className="text-right py-2 font-medium text-gray-900 w-24">Amount</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {invoiceData.lineItems.map((item) => (
+                            <tr key={item.id} className="border-b border-gray-100">
+                              <td className="py-3 text-gray-700">{item.description || "Service description"}</td>
+                              <td className="py-3 text-right text-gray-700">{item.quantity}</td>
+                              <td className="py-3 text-right text-gray-700">${item.rate.toFixed(2)}</td>
+                              <td className="py-3 text-right text-gray-700">${item.amount.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
 
+                    {/* Mobile Card View */}
+                    <div className="md:hidden space-y-4">
+                      {invoiceData.lineItems.map((item) => (
+                        <div key={item.id} className="border border-gray-200 rounded-lg p-4">
+                          <div className="font-medium text-gray-900 mb-2">
+                            {item.description || "Service description"}
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="text-gray-600">Qty:</span>
+                              <span className="ml-2 font-medium">{item.quantity}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Rate:</span>
+                              <span className="ml-2 font-medium">${item.rate.toFixed(2)}</span>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-right">
+                            <span className="text-gray-600">Amount:</span>
+                            <span className="ml-2 font-semibold text-lg">${item.amount.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   {/* Totals */}
-                  <div className="flex justify-end mb-8">
-                    <div className="w-64 space-y-2">
+                  <div className="flex justify-end mb-6 md:mb-8">
+                    <div className="w-full max-w-64 space-y-2">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Subtotal:</span>
                         <span className="text-gray-900">${subtotal.toFixed(2)}</span>
@@ -566,7 +648,6 @@ export default function InvoiceGenerator() {
                       </div>
                     </div>
                   </div>
-
                   {/* Notes */}
                   {invoiceData.notes && (
                     <div>
@@ -574,24 +655,25 @@ export default function InvoiceGenerator() {
                       <p className="text-gray-600 whitespace-pre-line">{invoiceData.notes}</p>
                     </div>
                   )}
+                  {/* Footer */}
+                  <div className="mt-8 md:mt-12 pt-6 md:pt-8 border-t border-gray-200 text-center text-sm text-gray-500">
+                    <p>Thank you for your business!</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
       </div>
-
       <style jsx global>{`
         @media print {
           body * {
             visibility: hidden;
           }
-
           #invoice-preview,
           #invoice-preview * {
             visibility: visible !important;
           }
-
           #invoice-preview {
             position: relative !important;
             max-width: 800px;
@@ -606,25 +688,17 @@ export default function InvoiceGenerator() {
           .print\\:block {
             display: block !important;
           }
-
           .print\\:hidden {
             display: none !important;
           }
-
           .print\\:p-0 {
             padding: 0 !important;
           }
-
           .print\\:shadow-none {
             box-shadow: none !important;
           }
         }
-    `}</style>
-
-    
-
-       
-      </div>
-    
+      `}</style>
+    </div>
   )
 }
