@@ -13,13 +13,9 @@ import { saveInvoice } from "@/lib/invoice-storage"
 import type { InvoiceData, LineItem } from "@/types/invoice"
 import { useToast } from "@/components/ui/use-toast"
 import { EmailInvoiceDialog } from "@/components/email-invoice-dialog"
-import { processEmailTemplate } from "@/lib/email-service"
-import { emailTemplates } from "@/lib/email-service"
-
-
-
-import { jsPDF } from 'jspdf'; 
-import  html2canvas  from 'html2canvas';
+import { processEmailTemplate, emailTemplates } from "@/lib/email-service"
+import { jsPDF } from "jspdf"
+import html2canvas from "html2canvas"
 
 const createEmptyInvoice = (): InvoiceData => ({
   invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
@@ -41,27 +37,10 @@ const createEmptyInvoice = (): InvoiceData => ({
 export default function InvoiceGenerator() {
   const printRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
-  const [invoiceData, setInvoiceData] = useState<InvoiceData>({
-    invoiceNumber: "",
-    id: "",
-    invoiceDate: "",
-    dueDate: "",
-    companyName: "",
-    companyAddress: "",
-    companyEmail: "",
-    companyPhone: "",
-    clientName: "",
-    clientAddress: "",
-    clientEmail: "",
-    lineItems: [{ id: "1", description: "", quantity: 1, rate: 0, amount: 0 }],
-    taxRate: 0,
-    notes: "",
-  })
+  const [invoiceData, setInvoiceData] = useState<InvoiceData>(createEmptyInvoice())
   const [selectedTemplate, setSelectedTemplate] = useState(emailTemplates[0])
- 
   const [isInitialized, setIsInitialized] = useState(false)
 
-  // Initialize with proper values on client side
   useEffect(() => {
     setInvoiceData(createEmptyInvoice())
     setIsInitialized(true)
@@ -112,249 +91,155 @@ export default function InvoiceGenerator() {
   const taxAmount = subtotal * (invoiceData.taxRate / 100)
   const total = subtotal + taxAmount
 
-  const handlePrint = () => {
-    window.print()
-  }
-
   const validation = () => {
-        if (!invoiceData.companyName || invoiceData.companyName.trim() === "") {
+    if (!invoiceData.companyName?.trim()) {
       toast({
         title: "Missing information",
         description: "Please add your company name before saving.",
         variant: "destructive",
-      });
-      return false;
-  }
-
-    if (!invoiceData.clientName || invoiceData.clientName.trim() === "") {
-      console.log("Validation failed: No client name")
+      })
+      return false
+    }
+    if (!invoiceData.clientName?.trim()) {
       toast({
         title: "Missing information",
         description: "Please add a client name before saving.",
         variant: "destructive",
       })
-      return false;
+      return false
     }
-
-    // Check line items
     const invalidLineItems = invoiceData.lineItems.filter(
-      (item) => !item.description || item.description.trim() === "" || item.amount === 0.00
+      (item) => !item.description?.trim() || item.amount === 0
     )
-
     if (invoiceData.lineItems.length === 0 || invalidLineItems.length > 0) {
       toast({
         title: "Invalid line items",
         description: "Please ensure all line items have descriptions and amounts greater than 0.",
         variant: "destructive",
       })
-      return false;
+      return false
     }
-
-    return true;
+    return true
   }
 
   const postInvoice = async () => {
-     try {
-    const res = await fetch('https://invoice-backend-g5q0.onrender.com/api/invoices', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(invoiceData),
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("Server error:", errorText);
-      throw new Error('Failed to send invoice');
-    }
-
-    const result = await res.json();
-    console.log('Invoice sent:', result.message);
-
-
-  } catch (err) {
-    console.error('Error sending invoice:', err);
-    toast({
-      title: 'Download Failed',
-      description: 'Unable to sync invoice to server.',
-      variant: 'destructive',
-    });
-  }
-}
-const handleDownload = async () => {
-  const isValid = validation();
-
-  if (!isValid){
-    alert('Missing fields, download failed!');
-    return;
-  }
-  // ...validation code remains unchanged
-  
-  const input = document.getElementById("invoice-preview");
-  if (!input) return;
-
-  try {
-    
-    postInvoice();
-    const canvas = await html2canvas(input, {
-      scale: 1.5,
-      useCORS: true,
-    });
-
-    const imgData = canvas.toDataURL("image/jpeg", 1);
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`${invoiceData.invoiceNumber || "invoice"}.pdf`);
-
-    toast({
-      title: 'Download Successful',
-      description: `Invoice ${invoiceData.invoiceNumber} downloaded.`,
-    });
-
-  } catch (err) {
-    console.error("Error generating PDF", err);
-    toast({
-      title: "Download Failed",
-      description: "There was a problem generating the PDF.",
-      variant: "destructive",
-    });
-  }
-alert("Downloading invoice");
-}
-
-
-  const handleSaveInvoice = () => {
-      const isValid = validation();
-
-    if (!isValid){
-       toast({
-        title: "Save failed",
-        description: "There was an error saving the invoice. Please try again.",
+    try {
+      const res = await fetch("https://invoice-backend-g5q0.onrender.com/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(invoiceData),
+      })
+      if (!res.ok) throw new Error("Failed to send invoice")
+      const result = await res.json()
+      console.log("Invoice sent:", result.message)
+    } catch (err) {
+      console.error("Error sending invoice:", err)
+      toast({
+        title: "Sync Failed",
+        description: "Unable to sync invoice to server.",
         variant: "destructive",
       })
-      return;
-    } else {
-      
-    toast({
-      title: 'Invoice Synced',
-      description: `Invoice ${invoiceData.invoiceNumber} has been saved.`,
-    });
     }
+  }
 
-    // Basic validation with detailed logging
-    
+  const handleDownload = async () => {
+    if (!validation()) return
+    const input = document.getElementById("invoice-preview")
+    if (!input) return
+    try {
+      postInvoice()
+      const canvas = await html2canvas(input, { scale: 1.5, useCORS: true })
+      const imgData = canvas.toDataURL("image/jpeg", 1)
+      const pdf = new jsPDF("p", "mm", "a4")
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width
+      pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight)
+      pdf.save(`${invoiceData.invoiceNumber || "invoice"}.pdf`)
+      toast({
+        title: "Download Successful",
+        description: `Invoice ${invoiceData.invoiceNumber} downloaded.`,
+      })
+    } catch (err) {
+      console.error("Error generating PDF", err)
+      toast({
+        title: "Download Failed",
+        description: "There was a problem generating the PDF.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSaveInvoice = () => {
+    if (!validation()) return
     try {
       saveInvoice(invoiceData)
-      console.log("Saving invoice:", invoiceData)
       postInvoice()
-
-  
-      // Also show a browser alert as backup confirmation
-      //
+      toast({
+        title: "Invoice Synced",
+        description: `Invoice ${invoiceData.invoiceNumber} has been saved.`,
+      })
     } catch (error) {
-      console.error("Error saving invoice:", error)
+      console.error("Save failed", error)
       toast({
         title: "Save failed",
         description: "There was an error saving the invoice. Please try again.",
         variant: "destructive",
       })
-      // Backup alert for errors too
-      alert(` Error saving invoice: ${error}`)
     }
   }
 
   const generatePdfBase64 = async (): Promise<string | null> => {
-  const input = document.getElementById("invoice-preview");
-  if (!input) return null;
-
-  try {
-    const canvas = await html2canvas(input, {
-      scale: 1.5,
-      useCORS: true,
-    });
-
-    const imgData = canvas.toDataURL("image/jpeg", 1);
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-
-    const pdfBlob = pdf.output("blob");
-    const arrayBuffer = await pdfBlob.arrayBuffer();
-    const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-
-    return base64String;
-  } catch (err) {
-    console.error("Error generating PDF for email", err);
-    return null;
-  }
-};
-
-
-
-
-  const handleNewInvoice = () => {
-    if (confirm("Are you sure you want to create a new invoice? Any unsaved changes will be lost.")) {
-      setInvoiceData(createEmptyInvoice())
-     
+    const input = document.getElementById("invoice-preview")
+    if (!input) return null
+    try {
+      const canvas = await html2canvas(input, { scale: 1.5, useCORS: true })
+      const imgData = canvas.toDataURL("image/jpeg", 1)
+      const pdf = new jsPDF("p", "mm", "a4")
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width
+      pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight)
+      const pdfBlob = pdf.output("blob")
+      const arrayBuffer = await pdfBlob.arrayBuffer()
+      const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+      return base64String
+    } catch (err) {
+      console.error("Error generating PDF for email", err)
+      return null
     }
   }
 
+  const handleNewInvoice = () => {
+    if (confirm("Are you sure you want to create a new invoice? Unsaved changes will be lost.")) {
+      setInvoiceData(createEmptyInvoice())
+    }
+  }
+
+  const handlePrint = () => window.print()
+
   const handleInvoiceDeleted = () => {
-  
-      toast({
-        title: "Invoice deleted",
-        description: "The invoice has been deleted.",
-      })
-    
+    toast({
+      title: "Invoice deleted",
+      description: "The invoice has been deleted.",
+    })
   }
 
   if (!isInitialized) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    )
+    return <div className="p-8 text-center text-gray-500">Loading...</div>
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <h1 className="text-3xl font-bold text-gray-900">Invoice Generator</h1>
-          <div className="flex gap-2 print:hidden">
-            <Button onClick={handleNewInvoice} variant="outline">
-              New Invoice
-            </Button>
-            <InvoiceList onInvoiceDeleted={handleInvoiceDeleted} />
-            <Button onClick={handleSaveInvoice} variant="outline"> 
-              
-              <Save className="w-4 h-4 mr-2" />Save
-            </Button>
-            <EmailInvoiceDialog invoiceData={invoiceData} totalAmount={total}  >
-              <Button variant="outline">
-                <Mail className="w-4 h-4 mr-2" />
-                Email
-              </Button>
-            </EmailInvoiceDialog>
-            <Button onClick={handlePrint} variant="outline">
-              <Printer className="w-4 h-4 mr-2" />
-              Print
-            </Button>
-            <Button onClick={handleDownload}>
-              <Download className="w-4 h-4 mr-2" />
-              Download PDF
-            </Button>
-          </div>
+    <div className="min-h-screen p-6 bg-gray-50">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={handleNewInvoice} variant="outline">New Invoice</Button>
+          <InvoiceList onInvoiceDeleted={handleInvoiceDeleted} />
+          <Button onClick={handleSaveInvoice} variant="outline"><Save className="w-4 h-4 mr-2" />Save</Button>
+          <EmailInvoiceDialog invoiceData={invoiceData} totalAmount={total} >
+            <Button variant="outline"><Mail className="w-4 h-4 mr-2" />Email</Button>
+          </EmailInvoiceDialog>
+          <Button onClick={handlePrint} variant="outline"><Printer className="w-4 h-4 mr-2" />Print</Button>
+          <Button onClick={handleDownload}><Download className="w-4 h-4 mr-2" />Download PDF</Button>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Form Section */}
           <div className="space-y-6 print:hidden">
@@ -708,6 +593,10 @@ alert("Downloading invoice");
           }
         }
       `}</style>
-    </div>
+    
+
+       
+      </div>
+    
   )
 }
