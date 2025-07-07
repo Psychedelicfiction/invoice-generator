@@ -15,7 +15,7 @@ export const emailTemplates = [
     id: "default",
     name: "Default Template",
     subject: "Invoice #{invoiceNumber} from {companyName}",
-    message: `Dear {clientName},
+    message: `Dear{clientName} client,
 
 Please find attached invoice #{invoiceNumber} for the amount of {totalAmount}.
 
@@ -60,35 +60,78 @@ export const processEmailTemplate = (
   let processedTemplate = template;
   processedTemplate = processedTemplate.replace(
     /{invoiceNumber}/g,
-    invoiceData.invoiceNumber
+    invoiceData.invoiceNumber || ""
   );
   processedTemplate = processedTemplate.replace(
     /{clientName}/g,
-    invoiceData.clientName
+    invoiceData.clientName || ""
   );
   processedTemplate = processedTemplate.replace(
     /{companyName}/g,
-    invoiceData.companyName
+    invoiceData.companyName || ""
   );
   processedTemplate = processedTemplate.replace(
     /{dueDate}/g,
-    new Date(invoiceData.dueDate).toLocaleDateString()
+    invoiceData.dueDate
+      ? new Date(invoiceData.dueDate).toLocaleDateString()
+      : ""
   );
   processedTemplate = processedTemplate.replace(
     /{totalAmount}/g,
-    `$${totalAmount.toFixed(2)}`
+    `$${totalAmount?.toFixed(2) || "0.00"}`
   );
   return processedTemplate;
 };
 
-// ✅ Real email sending function (calls backend API)
 export const sendInvoiceEmail = async (
   emailData: EmailData,
   invoiceData: any,
-  totalAmount: number
+  totalAmount: number,
+  toast: (opts: {
+    title: string;
+    description?: string;
+    variant?: "default" | "destructive";
+  }) => void
 ): Promise<{ success: boolean; message: string }> => {
+  //  Invoice field validation
+  if (
+    !invoiceData.invoiceNumber ||
+    !invoiceData.clientName ||
+    !invoiceData.companyName ||
+    !invoiceData.dueDate
+  ) {
+    toast({
+      title: "Missing Invoice Information",
+      description:
+        "Please complete all required invoice fields (number, client name, company name, due date).",
+      variant: "destructive",
+    });
+    return {
+      success: false,
+      message: "Missing required invoice fields.",
+    };
+  }
+
+  if (!totalAmount || isNaN(totalAmount)) {
+    toast({
+      title: "Invalid Total Amount",
+      description: "Invoice total amount must be a valid number.",
+      variant: "destructive",
+    });
+    return {
+      success: false,
+      message: "Invalid invoice total amount.",
+    };
+  }
+
+ 
   const input = document.getElementById("invoice-preview");
   if (!input) {
+    toast({
+      title: "Preview Not Found",
+      description: "Invoice preview section is missing.",
+      variant: "destructive",
+    });
     return {
       success: false,
       message: "Invoice preview not found.",
@@ -117,18 +160,27 @@ export const sendInvoiceEmail = async (
 
     const response = await fetch("http://localhost:5000/api/send-invoice", {
       method: "POST",
-      body: formData, // 👈 no JSON header needed
+      body: formData,
     });
 
     const result = await response.json();
+
+    toast({
+      title: "Email Sent",
+      description: `The invoice ${invoiceData.invoiceNumber} has been emailed successfully.`,
+    });
+
     return result;
   } catch (err) {
     console.error("Failed to send email:", err);
+    toast({
+      title: "Email Send Failed",
+      description: `The email for invoice ${invoiceData.invoiceNumber} failed to send.`,
+      variant: "destructive",
+    });
     return {
       success: false,
       message: "Error sending email. Please try again.",
     };
   }
 };
-
-

@@ -11,8 +11,8 @@ const sendInvoiceEmail = async (req, res) => {
 
     console.log("Received PDF:", pdfFile.originalname);
 
-    const emailData = JSON.parse(req.body.emailData);     // ✅ Now available
-    const invoiceData = JSON.parse(req.body.invoiceData); // ✅ Now available
+    const emailData = JSON.parse(req.body.emailData);     //  Now available
+    const invoiceData = JSON.parse(req.body.invoiceData); //  Now available
     const totalAmount = parseFloat(req.body.totalAmount);
 
     // Configure transporter (using example Gmail SMTP for simplicity)

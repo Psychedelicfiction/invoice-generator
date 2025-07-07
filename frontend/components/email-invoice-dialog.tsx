@@ -14,7 +14,8 @@ import { Separator } from "@/components/ui/separator"
 import { Mail, Send, Loader2, FileText } from "lucide-react"
 import { emailTemplates, sendInvoiceEmail, processEmailTemplate, type EmailData } from "@/lib/email-service"
 import type { InvoiceData } from "@/types/invoice"
-import { useToast } from "@/hooks/use-toast"
+//import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast";
 
 interface EmailInvoiceDialogProps {
   invoiceData: InvoiceData
@@ -58,6 +59,7 @@ export function EmailInvoiceDialog({ invoiceData, totalAmount,  children }: Emai
   }
 
   const handleSendEmail = async () => {
+     
     // Validation
     if (!emailData.to) {
       toast({
@@ -89,27 +91,20 @@ export function EmailInvoiceDialog({ invoiceData, totalAmount,  children }: Emai
     setIsSending(true)
 
     try {
-      const result = await sendInvoiceEmail(emailData, invoiceData, totalAmount)
+      const result = await sendInvoiceEmail(emailData, invoiceData, totalAmount, toast)
 
       if (result.success) {
-        toast({
-          title: "Email sent successfully",
-          description: result.message,
-        })
+        
         setIsOpen(false)
       } else {
-        toast({
-          title: "Failed to send email",
-          description: result.message,
-          variant: "destructive",
-        })
+        
       }
     } catch (error) {
       toast({
-        title: "Error sending email",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      })
+      title: "Email Send Failed",
+      description: `The email for invoice ${invoiceData.invoiceNumber} failed to send.`,
+      variant: "destructive",
+    });
     } finally {
       setIsSending(false)
     }

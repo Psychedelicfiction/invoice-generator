@@ -170,10 +170,6 @@ export default function InvoiceGenerator() {
     const result = await res.json();
     console.log('Invoice sent:', result.message);
 
-    toast({
-      title: 'Invoice Synced',
-      description: `Invoice ${invoiceData.invoiceNumber} has been saved.`,
-    });
 
   } catch (err) {
     console.error('Error sending invoice:', err);
@@ -239,7 +235,14 @@ alert("Downloading invoice");
         variant: "destructive",
       })
       return;
+    } else {
+      
+    toast({
+      title: 'Invoice Synced',
+      description: `Invoice ${invoiceData.invoiceNumber} has been saved.`,
+    });
     }
+
     // Basic validation with detailed logging
     
     try {
