@@ -155,7 +155,7 @@ export default function InvoiceGenerator() {
 
   const postInvoice = async () => {
      try {
-    const res = await fetch('http://localhost:5000/api/invoices', {
+    const res = await fetch('https://invoice-backend-g5q0.onrender.com/api/invoices', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(invoiceData),

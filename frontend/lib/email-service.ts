@@ -158,7 +158,7 @@ export const sendInvoiceEmail = async (
     formData.append("invoiceData", JSON.stringify(invoiceData));
     formData.append("totalAmount", totalAmount.toString());
 
-    const response = await fetch("http://localhost:5000/api/send-invoice", {
+    const response = await fetch("/api/send-invoice", {
       method: "POST",
       body: formData,
     });
